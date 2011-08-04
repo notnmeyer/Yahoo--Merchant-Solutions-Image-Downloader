@@ -55,6 +55,15 @@ setup_dir(store_id)
 puts "Attempting to download #{catalog_url}"
 download(catalog_url, full_path)
 
+# if catalog.xml is disabled, a file is still returned. the content is:
+# This store does not allow catalog contents to be exported
+@xml_disabled = "This store does not allow catalog contents to be exported"
+@first_line = File.open(full_path) {|f| f.readline}
+
+if @first_line == @xml_disabled
+  raise "Catalog.xml is disabled for #{store_id}. Go enable it and try again."
+end
+
 #parse it
 puts "Reading #{filename}"
 
