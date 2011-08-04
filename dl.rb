@@ -87,5 +87,5 @@ end
 
 #zip images
 puts "Zipping images"
-exec("find data/#{store_id}/ | zip #{store_id}.zip -@")
+system("find data/#{store_id}/ | zip #{store_id}.zip -@")
 puts "Done zipping images. You can find the file at path_to_dl.rb/#{store_id}.zip"
