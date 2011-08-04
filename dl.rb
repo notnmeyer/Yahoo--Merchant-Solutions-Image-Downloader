@@ -12,7 +12,7 @@ else
 end
 
 #extracts a URL from an image tag
-def parseImageUrl(data)
+def parse_image_url(data)
    data.scan(/http\:\/\/[0-9a-zA-Z\-\.\/_]+/)[0]
 end
   
@@ -26,8 +26,16 @@ def download(url, filename)
   end
 end
 
-def setupDir(store)
-  if !FileTest::directory?("data/" + store)
+def setup_dir(store)
+  unless FileTest::directory?("data")
+    begin
+      Dir::mkdir("data")
+    rescue => e.message
+      puts "Failed to create directory data: " + e.message
+    end
+  end
+
+  unless FileTest::directory?("data/" + store)
     begin
       Dir::mkdir("data/" + store)
     rescue => e
@@ -36,21 +44,21 @@ def setupDir(store)
   end
 end
 
-catalogUrl = "http://" + store_id + ".stores.yahoo.net/catalog.xml"
+catalog_url = "http://" + store_id + ".stores.yahoo.net/catalog.xml"
 filename = store_id + ".xml"
-fullPath = "data/#{store_id}/#{filename}"
+full_path = "data/#{store_id}/#{filename}"
 
 # create the file path
-setupDir(store_id)
+setup_dir(store_id)
 
 # download the xml
-puts "Attempting to download #{catalogUrl}"
-download(catalogUrl, fullPath)
+puts "Attempting to download #{catalog_url}"
+download(catalog_url, full_path)
 
 #parse it
 puts "Reading #{filename}"
 
-@file_handle = File.open(fullPath)
+@file_handle = File.open(full_path)
 @xml = Nokogiri::XML(@file_handle)
 
 #get items
@@ -60,9 +68,9 @@ puts "Reading #{filename}"
       if item_field_node['Value'].empty?
         puts "#{item_node['ID']} has a nil image"
       else
-        boom = parseImageUrl(item_field_node['Value'])
-        imagePath = "data/" + store_id + "/" + item_node['ID'] + ".gif"
-        download(boom, imagePath)
+        boom = parse_image_url(item_field_node['Value'])
+        image_path = "data/" + store_id + "/" + item_node['ID'] + ".gif"
+        download(boom, image_path)
       end
     end
   end
@@ -72,9 +80,9 @@ end
 
 #don't need the xml file anymore
 begin 
-  File.delete(fullPath)
+  File.delete(full_path)
 rescue => e
-  puts "Failed to delete the file #{fullPath} because: " + e.message
+  puts "Failed to delete the file #{full_path} because: " + e.message
 end
 
 #zip images
