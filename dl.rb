@@ -1,100 +1,95 @@
-#!/usr/bin/env ruby
+#!/bin/env ruby
 
 require 'rubygems'
 require 'curb'
 require 'nokogiri'
 
-#check for a command line arg
-if ARGV.count == 1
-  store_id = ARGV[0]
-else
-  raise "Incorrect argument count.\nArgument count: #{ARGV.count}\nUsage: ruby dl.rb store-id"
-end
+class XmlParseDownloadZip
+  attr_accessor :url_to_xml, :download, :folder, :zip_filename, :xml, :resources, :threads
 
-#extracts a URL from an image tag
-def parse_image_url(data)
-   data.scan(/http\:\/\/[0-9a-zA-Z\-\.\/_]+/)[0]
-end
-  
-def download(url, filename)
-  begin 
-    curl = Curl::Easy.download(url, filename)
+  def initialize(url, store_id)
+    @url = url
+    @data_loc = 'data'
+    @zip_filename = "#{store_id}.zip"
+    @xml_filename = "catalog.xml"
+    @folder = "#{@data_loc}/#{store_id}"
+    @resources = []
+    @time_of_init = Time.now
+    @threads = []
+    @logger = Logger.new(STDOUT)
+
+    setup_temp_directory
+    download
+  end
+
+  def setup_temp_directory(data_loc = @data_loc, folder = @folder)
+    Dir::mkdir("#{data_loc}") unless FileTest::directory? "#{data_loc}"
+    Dir::mkdir("#{folder}") unless FileTest::directory? "#{folder}"
+  end
+
+  def download(path = @url, filename = @xml_filename)
+    Curl::Easy.download(path, "#{@folder}/#{filename}")
+    @logger.info "[#{(Time.now - @time_of_init).seconds}] wrote to #{folder}/#{filename}"
   rescue => e
-    puts "Couldn't download #{filename} because: " + e.message
-  else 
-    puts "Wrote to #{filename}"
+    @logger.info "*** Couldn't download #{path} because :\n" + e.message
   end
-end
 
-def setup_dir(store)
-  unless FileTest::directory?("data")
-    begin
-      Dir::mkdir("data")
-    rescue => e.message
-      puts "Failed to create directory data: " + e.message
+  def download_resources
+    slice = 75
+    @resources.each_slice(slice) do |resources|
+      @threads << Thread.new {resources.each {|resource| download(resource[0], resource[1])}}
+      @logger.info "[#{(Time.now - @time_of_init).seconds} elapsed Queuing #{slice} chunks"
     end
+    @threads.each{|thread| thread.join}
   end
 
-  unless FileTest::directory?("data/" + store)
-    begin
-      Dir::mkdir("data/" + store)
-    rescue => e
-      puts "Failed to create directory data/#{store}: " + e.message
-    end
+  def parse
+    @xml ||= Nokogiri::XML(file)
+    yield @xml, @resources
+  end
+  
+  def clean_up(file_path = "#{@folder}/#{@xml_filename}") 
+    File.delete(file_path)
+    
+  rescue => e
+      @logger.info e.message
+  end
+
+  def zip(zip = @zip_filename)
+    @logger.info "Zipping images"
+    system "find #{@folder} | zip #{@store_id}.zip -@"
+    @logger.info "Done in #{(Time.now - @time_of_init).seconds} seconds."
+  end
+
+  protected
+
+  def file
+    @opened_file ||= File.open("#{@folder}/#{@xml_filename}")
   end
 end
 
-catalog_url = "http://" + store_id + ".stores.yahoo.net/catalog.xml"
-filename = store_id + ".xml"
-full_path = "data/#{store_id}/#{filename}"
+if ARGV.count == 1
+  @store_id = ARGV[0]
+  url = "http://#{@store_id}.stores.yahoo.net/catalog.xml"
+  parse_bot = XmlParseDownloadZip.new(url, @store_id)
 
-# create the file path
-setup_dir(store_id)
-
-# download the xml
-puts "Attempting to download #{catalog_url}"
-download(catalog_url, full_path)
-
-# if catalog.xml is disabled, a file is still returned. the content is:
-# This store does not allow catalog contents to be exported
-@xml_disabled = "This store does not allow catalog contents to be exported"
-@first_line = File.open(full_path) {|f| f.readline}
-
-if @first_line == @xml_disabled
-  raise "Catalog.xml is disabled for #{store_id}. Go enable it and try again."
-end
-
-#parse it
-puts "Reading #{filename}"
-
-@file_handle = File.open(full_path)
-@xml = Nokogiri::XML(@file_handle)
-
-#get items
-@xml.css('Item[@ID]').each do |item_node|
-  item_node.css('ItemField[@TableFieldID]').each do |item_field_node|
-    if item_field_node['TableFieldID'] == 'image'
-      if item_field_node['Value'].empty?
-        puts "#{item_node['ID']} has a nil image"
-      else
-        boom = parse_image_url(item_field_node['Value'])
-        image_path = "data/" + store_id + "/" + item_node['ID'] + ".gif"
-        download(boom, image_path)
+  parse_bot.parse do |xml, resources|
+    xml.css('Item[@ID]').each do |item_node|
+      item_node.css('ItemField[@TableFieldID]').each do |item_field_node|
+        if item_field_node['TableFieldID'] == 'image'
+          resources << [item_field_node['Value'][/http\:\/\/[0-9a-zA-Z\-\.\/_]+/], item_node['ID'] + ".gif"] unless item_field_node['Value'].empty?
+        end
       end
     end
   end
+
+  parse_bot.download_resources
+  parse_bot.clean_up
+  parse_bot.zip
+else
+  raise "Incorrect argument count. \nUsage: ruby dl.rb store_id"
 end
 
-@file_handle.close
 
-#don't need the xml file anymore
-begin 
-  File.delete(full_path)
-rescue => e
-  puts "Failed to delete the file #{full_path} because: " + e.message
-end
 
-#zip images
-puts "Zipping images"
-system("find data/#{store_id}/ | zip #{store_id}.zip -@")
-puts "Done zipping images. You can find the file at path_to_dl.rb/#{store_id}.zip"
+
