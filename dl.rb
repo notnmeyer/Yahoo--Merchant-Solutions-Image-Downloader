@@ -3,6 +3,7 @@
 require 'rubygems'
 require 'curb'
 require 'nokogiri'
+require 'active_support/all'
 
 class XmlParseDownloadZip
   attr_accessor :url_to_xml, :download, :folder, :zip_filename, :xml, :resources, :threads
@@ -16,7 +17,7 @@ class XmlParseDownloadZip
     @resources = []
     @time_of_init = Time.now
     @threads = []
-    @logger = Logger.new(STDOUT)
+    @log = Logger.new(STDOUT)
 
     setup_temp_directory
     download
@@ -29,16 +30,16 @@ class XmlParseDownloadZip
 
   def download(path = @url, filename = @xml_filename)
     Curl::Easy.download(path, "#{@folder}/#{filename}")
-    @logger.info "[#{(Time.now - @time_of_init).seconds}] wrote to #{folder}/#{filename}"
+    @log.info "[#{(Time.now - @time_of_init).seconds}] wrote to #{folder}/#{filename}"
   rescue => e
-    @logger.info "*** Couldn't download #{path} because :\n" + e.message
+    @log.info "*** Couldn't download #{path} because :\n" + e.message
   end
 
   def download_resources
     slice = 75
     @resources.each_slice(slice) do |resources|
       @threads << Thread.new {resources.each {|resource| download(resource[0], resource[1])}}
-      @logger.info "[#{(Time.now - @time_of_init).seconds} elapsed Queuing #{slice} chunks"
+      @log.info "[#{(Time.now - @time_of_init).seconds} elapsed Queuing #{slice} chunks"
     end
     @threads.each{|thread| thread.join}
   end
@@ -52,13 +53,13 @@ class XmlParseDownloadZip
     File.delete(file_path)
     
   rescue => e
-      @logger.info e.message
+      @log.info e.message
   end
 
   def zip(zip = @zip_filename)
-    @logger.info "Zipping images"
-    system "find #{@folder} | zip #{@store_id}.zip -@"
-    @logger.info "Done in #{(Time.now - @time_of_init).seconds} seconds."
+    @log.info "Zipping images"
+    system "find #{@folder} | zip #{zip} -@"
+    @log.info "Done in #{(Time.now - @time_of_init).seconds} seconds."
   end
 
   protected
