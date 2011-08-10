@@ -39,7 +39,7 @@ class XmlParseDownloadZip
     slice = 75
     @resources.each_slice(slice) do |resources|
       @threads << Thread.new {resources.each {|resource| download(resource[0], resource[1])}}
-      @log.info "[#{(Time.now - @time_of_init).seconds} elapsed Queuing #{slice} chunks"
+      #@log.info "[#{(Time.now - @time_of_init).seconds}] Queuing more chunks."
     end
     @threads.each{|thread| thread.join}
   end
@@ -51,7 +51,6 @@ class XmlParseDownloadZip
   
   def clean_up(file_path = "#{@folder}/#{@xml_filename}") 
     File.delete(file_path)
-    
   rescue => e
       @log.info e.message
   end
@@ -69,7 +68,7 @@ class XmlParseDownloadZip
   end
 end
 
-if ARGV.count == 1
+if ARGV.count > 0 && ARGV[0].match(/^[0-9a-zA-Z\-]+$/)
   @store_id = ARGV[0]
   url = "http://#{@store_id}.stores.yahoo.net/catalog.xml"
   parse_bot = XmlParseDownloadZip.new(url, @store_id)
@@ -78,7 +77,8 @@ if ARGV.count == 1
     xml.css('Item[@ID]').each do |item_node|
       item_node.css('ItemField[@TableFieldID]').each do |item_field_node|
         if item_field_node['TableFieldID'] == 'image'
-          resources << [item_field_node['Value'][/http\:\/\/[0-9a-zA-Z\-\.\/_]+/], item_node['ID'] + ".gif"] unless item_field_node['Value'].empty?
+          resources << [item_field_node['Value'][/http\:\/\/[0-9a-zA-Z\-\.\/_]+/],\
+            item_node['ID'] + ".gif"] unless item_field_node['Value'].empty?
         end
       end
     end
@@ -88,9 +88,5 @@ if ARGV.count == 1
   parse_bot.clean_up
   parse_bot.zip
 else
-  raise "Incorrect argument count. \nUsage: ruby dl.rb store_id"
+  raise "\nUsage: ruby dl.rb store_id\nCheck your Store ID  and try again."
 end
-
-
-
-
