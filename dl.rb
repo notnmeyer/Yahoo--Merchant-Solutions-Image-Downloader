@@ -77,8 +77,10 @@ if ARGV.count == 1
   parse_bot.parse do |xml, resources|
     xml.css('Item[@ID]').each do |item_node|
       item_node.css('ItemField[@TableFieldID]').each do |item_field_node|
-        if item_field_node['TableFieldID'] == 'image'
-          resources << [item_field_node['Value'][/http\:\/\/[0-9a-zA-Z\-\.\/_]+/], item_node['ID'] + ".gif"] unless item_field_node['Value'].empty?
+        case item_field_node['TableFieldID']
+        when 'image', 'icon', 'inset'
+          @image_name = item_node['ID'] + "-" + item_field_node['TableFieldID'] + ".gif"
+          resources << [item_field_node['Value'][/http\:\/\/[0-9a-zA-Z\-\.\/_]+/], @image_name] unless item_field_node['Value'].empty?
         end
       end
     end

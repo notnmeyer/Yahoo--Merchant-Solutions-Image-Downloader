@@ -1,6 +1,6 @@
 Yahoo! Merchant Solutions Image Download
 
-This commandline ruby script will attempt to download your catalog.xml file, grab all the images contained within, rename them to match your Item IDs, and finally zip them. 
+This commandline ruby script will attempt to download your catalog.xml file, grab the images set in the Image, Icon, and Inset fields, rename them to match your Item IDs, and finally zip them. 
 
 This obviously requires your catalog.xml be enabled. This will not work for Yahoo! Stores.
 
