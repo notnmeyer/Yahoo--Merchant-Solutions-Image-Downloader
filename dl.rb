@@ -71,26 +71,41 @@ end
 if ARGV.count > 0 && ARGV[0].match(/^[0-9a-zA-Z\-]+$/)
   @store_id = ARGV[0]
   url = "http://#{@store_id}.stores.yahoo.net/catalog.xml"
+  customfields = []
+
   parse_bot = XmlParseDownloadZip.new(url, @store_id)
 
   parse_bot.parse do |xml, resources|
-    # start by getting the default image fields: image, icon, inset
+    # get the custom image fields
+    xml.css('Table[@ID]').each do |table_node|
+      table_node.css('TableField[@ID]').each do |table_field_node|
+        case table_field_node['Type']
+        when 'image'
+          case table_field_node['ID']
+          when 'image', 'icon', 'inset'
+            # ignore default fields
+            next
+          else
+            customfields << table_field_node['ID']
+          end
+        end
+      end
+    end
+    
+    # alright, lets grab some images
     xml.css('Item[@ID]').each do |item_node|
       item_node.css('ItemField[@TableFieldID]').each do |item_field_node|
         case item_field_node['TableFieldID']
         when 'image', 'icon', 'inset'
           @image_name = item_node['ID'] + "-" + item_field_node['TableFieldID'] + ".gif"
           resources << [item_field_node['Value'][/http\:\/\/[0-9a-zA-Z\-\.\/_]+/], @image_name] unless item_field_node['Value'].empty?
-        end
-      end
-    end
-
-    # lets get the custom image fields
-    xml.css('Table[@ID]').each do |table_node|
-      table_node.css('TableField[@ID]').each do |table_field_node|
-        case table_field_node['Type']
-        when 'image'
-          #puts table_field_node['ID'] # finds all image fields in all tables, need to exclude default fields.
+        else
+          customfields.each do |custom_image_field|
+            @image_name = item_node['ID'] + "-" + item_field_node['TableFieldID'] + ".gif"
+            if item_field_node['TableFieldID'] == custom_image_field
+              resources << [item_field_node['Value'][/http\:\/\/[0-9a-zA-Z\-\.\/_]+/], @image_name] unless item_field_node['Value'].empty?
+            end   
+          end
         end
       end
     end
