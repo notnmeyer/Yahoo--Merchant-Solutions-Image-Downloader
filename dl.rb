@@ -74,12 +74,23 @@ if ARGV.count > 0 && ARGV[0].match(/^[0-9a-zA-Z\-]+$/)
   parse_bot = XmlParseDownloadZip.new(url, @store_id)
 
   parse_bot.parse do |xml, resources|
+    # start by getting the default image fields: image, icon, inset
     xml.css('Item[@ID]').each do |item_node|
       item_node.css('ItemField[@TableFieldID]').each do |item_field_node|
         case item_field_node['TableFieldID']
         when 'image', 'icon', 'inset'
           @image_name = item_node['ID'] + "-" + item_field_node['TableFieldID'] + ".gif"
           resources << [item_field_node['Value'][/http\:\/\/[0-9a-zA-Z\-\.\/_]+/], @image_name] unless item_field_node['Value'].empty?
+        end
+      end
+    end
+
+    # lets get the custom image fields
+    xml.css('Table[@ID]').each do |table_node|
+      table_node.css('TableField[@ID]').each do |table_field_node|
+        case table_field_node['Type']i
+        when 'image'
+          #puts table_field_node['ID'] # finds all image fields in all table, need to exclude default fields.
         end
       end
     end
