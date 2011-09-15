@@ -88,9 +88,9 @@ if ARGV.count > 0 && ARGV[0].match(/^[0-9a-zA-Z\-]+$/)
     # lets get the custom image fields
     xml.css('Table[@ID]').each do |table_node|
       table_node.css('TableField[@ID]').each do |table_field_node|
-        case table_field_node['Type']i
+        case table_field_node['Type']
         when 'image'
-          #puts table_field_node['ID'] # finds all image fields in all table, need to exclude default fields.
+          #puts table_field_node['ID'] # finds all image fields in all tables, need to exclude default fields.
         end
       end
     end
