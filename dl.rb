@@ -37,6 +37,7 @@ class XmlParseDownloadZip
 
   def download_resources
     slice = 75
+    @log.info "#{@resources.count} items preparing to download"
     @resources.each_slice(slice) do |resources|
       @threads << Thread.new {resources.each {|resource| download(resource[0], resource[1])}}
       #@log.info "[#{(Time.now - @time_of_init).seconds}] Queuing more chunks."
@@ -58,7 +59,7 @@ class XmlParseDownloadZip
   def zip(zip = @zip_filename)
     @log.info "Zipping images"
     system "find #{@folder} | zip #{zip} -@"
-    @log.info "Done in #{(Time.now - @time_of_init).seconds} seconds."
+    @log.info "Done in #{(Time.now - @time_of_init).seconds} seconds"
   end
 
   protected
@@ -71,23 +72,16 @@ end
 if ARGV.count > 0 && ARGV[0].match(/^[0-9a-zA-Z\-]+$/)
   @store_id = ARGV[0]
   url = "http://#{@store_id}.stores.yahoo.net/catalog.xml"
-  customfields = []
+  extracted_image_fields = ['icon', 'image', 'inset']
 
   parse_bot = XmlParseDownloadZip.new(url, @store_id)
 
   parse_bot.parse do |xml, resources|
-    # get the custom image fields
+    # get all image fields
     xml.css('Table[@ID]').each do |table_node|
       table_node.css('TableField[@ID]').each do |table_field_node|
-        case table_field_node['Type']
-        when 'image'
-          case table_field_node['ID']
-          when 'image', 'icon', 'inset'
-            # ignore default fields
-            next
-          else
-            customfields << table_field_node['ID']
-          end
+        if table_field_node['Type'] == 'image'
+          extracted_image_fields << table_field_node['ID']
         end
       end
     end
@@ -95,18 +89,12 @@ if ARGV.count > 0 && ARGV[0].match(/^[0-9a-zA-Z\-]+$/)
     # alright, lets grab some images
     xml.css('Item[@ID]').each do |item_node|
       item_node.css('ItemField[@TableFieldID]').each do |item_field_node|
-        case item_field_node['TableFieldID']
-        when 'image', 'icon', 'inset'
-          @image_name = item_node['ID'] + "-" + item_field_node['TableFieldID'] + ".gif"
-          resources << [item_field_node['Value'][/http\:\/\/[0-9a-zA-Z\-\.\/_]+/], @image_name] unless item_field_node['Value'].empty?
-        else
-          customfields.each do |custom_image_field|
+        extracted_image_fields.uniq.each do |image_field|
+          if item_field_node['TableFieldID'] == image_field
             @image_name = item_node['ID'] + "-" + item_field_node['TableFieldID'] + ".gif"
-            if item_field_node['TableFieldID'] == custom_image_field
-              resources << [item_field_node['Value'][/http\:\/\/[0-9a-zA-Z\-\.\/_]+/], @image_name] unless item_field_node['Value'].empty?
-            end   
+            resources << [item_field_node['Value'][/http\:\/\/[0-9a-zA-Z\-\.\/_]+/], @image_name] unless item_field_node['Value'].empty?
           end
-        end
+        end   
       end
     end
   end
