@@ -1,4 +1,4 @@
-#!/bin/env ruby
+#!/usr/bin/env ruby
 
 require 'rubygems'
 require 'curb'
@@ -29,18 +29,18 @@ class XmlParseDownloadZip
   end
 
   def download(path = @url, filename = @xml_filename)
+    log_info "downloading #{filename}"
     Curl::Easy.download(path, "#{@folder}/#{filename}")
-    @log.info "[#{(Time.now - @time_of_init).seconds}] wrote to #{folder}/#{filename}"
+    log_info "wrote to #{folder}/#{filename}"
   rescue => e
-    @log.info "*** Couldn't download #{path} because :\n" + e.message
+    log_info "Couldn't download #{path} because :\n" + e.message
   end
 
   def download_resources
     slice = 75
-    @log.info "#{@resources.count} items preparing to download"
+    log_info "#{@resources.count} items preparing to download"
     @resources.each_slice(slice) do |resources|
       @threads << Thread.new {resources.each {|resource| download(resource[0], resource[1])}}
-      #@log.info "[#{(Time.now - @time_of_init).seconds}] Queuing more chunks."
     end
     @threads.each{|thread| thread.join}
   end
@@ -57,9 +57,9 @@ class XmlParseDownloadZip
   end
 
   def zip(zip = @zip_filename)
-    @log.info "Zipping images"
+    log_info "Zipping images"
     system "find #{@folder} | zip #{zip} -@"
-    @log.info "Done in #{(Time.now - @time_of_init).seconds} seconds"
+    log_info "Done!"
   end
 
   protected
@@ -67,15 +67,23 @@ class XmlParseDownloadZip
   def file
     @opened_file ||= File.open("#{@folder}/#{@xml_filename}")
   end
+  
+  def run_time
+    age = (Time.now - @time_of_init)
+    age.seconds unless age < 0.003
+  end 
+  
+  def log_info(msg)
+    @log.info "#{run_time} #{msg}"
+  end
 end
 
 if ARGV.count > 0 && ARGV[0].match(/^[0-9a-zA-Z\-]+$/)
   @store_id = ARGV[0]
   url = "http://#{@store_id}.stores.yahoo.net/catalog.xml"
-  extracted_image_fields = ['icon', 'image', 'inset']
+  extracted_image_fields = []
 
   parse_bot = XmlParseDownloadZip.new(url, @store_id)
-
   parse_bot.parse do |xml, resources|
     # get all image fields
     xml.css('Table[@ID]').each do |table_node|
@@ -84,21 +92,20 @@ if ARGV.count > 0 && ARGV[0].match(/^[0-9a-zA-Z\-]+$/)
           extracted_image_fields << table_field_node['ID']
         end
       end
-    end
-    
+    end   
     # alright, lets grab some images
     xml.css('Item[@ID]').each do |item_node|
       item_node.css('ItemField[@TableFieldID]').each do |item_field_node|
         extracted_image_fields.uniq.each do |image_field|
           if item_field_node['TableFieldID'] == image_field
             @image_name = item_node['ID'] + "-" + item_field_node['TableFieldID'] + ".gif"
-            resources << [item_field_node['Value'][/http\:\/\/[0-9a-zA-Z\-\.\/_]+/], @image_name] unless item_field_node['Value'].empty?
+            resources << [item_field_node['Value'][/http\:\/\/[0-9a-zA-Z\-\.\/_]+/], @image_name] \
+              unless item_field_node['Value'].empty?
           end
         end   
       end
     end
   end
-
   parse_bot.download_resources
   parse_bot.clean_up
   parse_bot.zip
