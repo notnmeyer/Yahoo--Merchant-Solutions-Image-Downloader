@@ -1,9 +1,27 @@
 #!/usr/bin/env ruby
 
 require 'rubygems'
+require 'optparse'
 require 'curb'
 require 'nokogiri'
 require 'active_support/all'
+
+# parse args
+options = {}
+OptionParser.new do |opts|
+  opts.on( "-s",
+           "--storeid storeid", 
+           "the store id we're fetching data from" ) do |storeid|
+             options[:store] = storeid
+           end
+  opts.on( "-t", 
+           "--threads threads", 
+           Numeric, 
+           "the number of concurrent image downloads", 
+           "default: 100" ) do |threads|
+             options[:threads] = threads
+           end
+end.parse!
 
 class XmlParseDownloadZip
   attr_accessor :url_to_xml, :download, :folder, :zip_filename, :xml, :resources, :threads
@@ -34,10 +52,13 @@ class XmlParseDownloadZip
     log_info "wrote to #{folder}/#{filename}"
   rescue => e
     log_info "Couldn't download #{path} because :\n" + e.message
+    # should be doing something here. if we cant grab an image, we should 
+    # set it aside and try again later.
   end
 
-  def download_resources
-    slice = 75
+  def download_resources( slice )
+    # slice is the number of threads we are going to create
+    # i see more "cant resolve host errors" if i raise this
     log_info "#{@resources.count} items preparing to download"
     @resources.each_slice(slice) do |resources|
       @threads << Thread.new {resources.each {|resource| download(resource[0], resource[1])}}
@@ -52,6 +73,7 @@ class XmlParseDownloadZip
   
   def clean_up(file_path = "#{@folder}/#{@xml_filename}") 
     File.delete(file_path)
+    #File.delete(@folder)
   rescue => e
       @log.info e.message
   end
@@ -78,12 +100,16 @@ class XmlParseDownloadZip
   end
 end
 
-if ARGV.count > 0 && ARGV[0].match(/^[0-9a-zA-Z\-]+$/)
-  @store_id = ARGV[0]
+# main logic
+
+store_id_regex = /^[0-9a-zA-Z\-]+$/
+if options[:store] && options[:store].match( store_id_regex )
+  @store_id = options[:store]
   url = "http://#{@store_id}.stores.yahoo.net/catalog.xml"
   extracted_image_fields = []
 
   parse_bot = XmlParseDownloadZip.new(url, @store_id)
+
   parse_bot.parse do |xml, resources|
     # get all image fields
     xml.css('Table[@ID]').each do |table_node|
@@ -106,9 +132,9 @@ if ARGV.count > 0 && ARGV[0].match(/^[0-9a-zA-Z\-]+$/)
       end
     end
   end
-  parse_bot.download_resources
+  parse_bot.download_resources( options[:threads] )
   parse_bot.clean_up
   parse_bot.zip
 else
-  raise "\nUsage: ruby dl.rb store_id\nCheck your Store ID  and try again."
+  raise "\nUsage: dl.rb -s/--storeid your_storeid -t/--threads number_of_concurrent_downloads\nCheck your Store ID  and try again."
 end
