@@ -2,7 +2,7 @@ Yahoo! Merchant Solutions Image Downloader
 
 This will attempt to turn all product images in your Yahoo! Merchant Solutions store into a zip archive. The files will be named itemid-fieldname.gif. 
 
-Requirments:
+Requirements:
 - catalog.xml enabled
 - OS X or another Unix-like environment where we can make system() calls to zip.
 
