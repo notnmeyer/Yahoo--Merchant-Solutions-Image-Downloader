@@ -1,7 +1,11 @@
-Yahoo! Merchant Solutions Image Download
+Yahoo! Merchant Solutions Image Downloader
 
-This commandline ruby script will attempt to download your catalog.xml file, grab the images set in the Image, Icon, and Inset fields, rename them to match your Item IDs, and finally zip them. 
+This will attempt to turn all product images in your Yahoo! Merchant Solutions store into a zip archive. The files will be named itemid-fieldname.gif. 
 
-This obviously requires your catalog.xml be enabled. This will not work for Yahoo! Stores.
+Requirments:
+- catalog.xml enabled
+- OS X or another Unix-like environment where we can make system() calls to zip.
 
-Usage: ruby dl.rb your_store_id
+I haven't test this on Windows (with or without Cygwin). If this doesn't work for whatever reason, I encourage you to begin to panic.
+
+Usage: dl.rb -s your_store_id
